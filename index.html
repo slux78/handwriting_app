@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마음 필사(筆寫) - Gemini AI 필사 노트</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 사이드바: 날짜별 기록 및 보관함 -->
+    <aside class="sidebar no-print">
+      <div class="sidebar-header">
+        <div class="brand">
+          <span class="brand-icon">🖋️</span>
+          <h2>필사(筆寫) 보관함</h2>
+        </div>
+        <p class="brand-sub">한 장의 글, 하루의 사색</p>
+      </div>
+
+      <div class="sidebar-actions">
+        <button id="btn-show-recent" class="btn-secondary active">최근 작성 목록</button>
+      </div>
+
+      <div class="dates-section">
+        <h3><span class="icon">📅</span> 날짜별 아카이브</h3>
+        <div id="dates-list" class="dates-list">
+          <div class="empty-state">불러오는 중...</div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="btn-open-settings" class="btn-text">
+          ⚙️ Gemini 설정 <span id="api-status-dot" class="status-dot"></span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="main-content">
+      <!-- 상단 툴바 -->
+      <header class="top-toolbar no-print">
+        <div class="category-selector-group">
+          <label for="category-select">분야:</label>
+          <select id="category-select" class="custom-select">
+            <option value="">전체 무작위 (시/소설/에세이/명언)</option>
+            <option value="시">시 (詩)</option>
+            <option value="소설">소설 명문장</option>
+            <option value="에세이">인생 에세이</option>
+            <option value="여행기">사색 여행기</option>
+            <option value="위대한 사상가의 명언 및 철학 수필">사상가의 철학·명언</option>
+          </select>
+
+          <label for="model-select">모델:</label>
+          <select id="model-select" class="custom-select" title="원하시는 AI 모델을 선택하세요">
+            <option value="gemini-3.8-flash" selected>Gemini 3.8 Flash (추천)</option>
+            <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (경량)</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+          </select>
+
+          <button id="btn-generate" class="btn-primary">
+            <span class="btn-icon">✨</span>
+            <span class="btn-text-content">새로운 필사 글 생성하기</span>
+          </button>
+        </div>
+
+        <div class="toolbar-tools">
+          <div class="font-controls">
+            <button id="btn-font-smaller" title="글자 크기 축소">가-</button>
+            <button id="btn-font-reset" title="글자 크기 초기화">기본</button>
+            <button id="btn-font-larger" title="글자 크기 확대">가+</button>
+          </div>
+          <button id="btn-toggle-practice" class="btn-outline" title="직접 손/키보드로 필사하기">
+            ✍️ 필사 연습 모드
+          </button>
+          <button id="btn-copy" class="btn-outline" title="내용 클립보드 복사">
+            📋 복사
+          </button>
+          <button id="btn-print" class="btn-outline" title="A4 1장 규격으로 깔끔하게 인쇄">
+            🖨️ A4 인쇄
+          </button>
+        </div>
+      </header>
+
+      <!-- 생성 상태 및 알림 바 -->
+      <div id="status-banner" class="status-banner hidden no-print">
+        <span id="status-message"></span>
+        <button id="btn-close-banner" class="close-banner">&times;</button>
+      </div>
+
+      <!-- 로딩 오버레이 -->
+      <div id="loading-overlay" class="loading-overlay hidden no-print">
+        <div class="loading-card">
+          <div class="pen-animation">✒️</div>
+          <h3 id="loading-title">Gemini AI와 교감하며 깊이 있는 문장을 엮어내는 중...</h3>
+          <p id="loading-sub">A4 1장 분량의 고품격 문장을 준비하고 있습니다. (<strong id="loading-timer">0.0</strong>초)</p>
+        </div>
+      </div>
+
+      <!-- 메인 뷰어 래퍼 (A4 용지 레이아웃) -->
+      <div class="paper-stage">
+        <div id="a4-sheet" class="a4-sheet">
+          <div class="sheet-watermark no-print">A4 筆寫</div>
+          
+          <div class="sheet-header">
+            <div class="meta-tags">
+              <span id="display-category" class="badge-category">시</span>
+              <span id="display-date" class="meta-date">2026-09-12</span>
+              <span id="display-chars" class="meta-chars">920자</span>
+            </div>
+            <h1 id="display-title" class="sheet-title">서시(序詩)</h1>
+            <p id="display-author" class="sheet-author">윤동주</p>
+          </div>
+
+          <div class="sheet-divider"></div>
+
+          <!-- 필사 본문 -->
+          <article id="display-content" class="sheet-body">
+            죽는 날까지 하늘을 우러러
+            한 점 부끄럼이 없기를,
+            잎새에 이는 바람에도
+            나는 괴로워했다.
+            별을 노래하는 마음으로
+            모든 죽어가는 것을 사랑해야지
+            그리고 나한테 주어진 길을
+            걸어가야겠다.
+
+            오늘 밤에도 별이 바람에 스치운다.
+          </article>
+
+          <!-- 인쇄 시 나타나는 여백 안내 -->
+          <div class="sheet-footer">
+            <div class="footer-line"></div>
+            <p class="footer-text">「마음 필사」 — 고요한 사색의 시간</p>
+          </div>
+        </div>
+
+        <!-- 타이핑 필사 연습 모드 (선택적 표시) -->
+        <div id="practice-panel" class="practice-panel hidden no-print">
+          <div class="practice-header">
+            <h4>✍️ 키보드 필사 연습</h4>
+            <div class="practice-stats">
+              <span>진행률: <strong id="practice-progress">0%</strong></span>
+              <span>작성 글자: <strong id="practice-count">0</strong>자</span>
+            </div>
+          </div>
+          <textarea id="practice-input" placeholder="위 문장을 천천히 마음에 새기며 직접 타이핑해보세요..."></textarea>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Gemini API 설정 모달 -->
+  <div id="settings-modal" class="modal-backdrop hidden no-print">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>⚙️ Gemini API 및 모델 설정</h3>
+        <button id="btn-close-modal" class="close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="info-desc">
+          Google AI Studio에서 발급받은 Gemini API 키를 등록하면, 실시간으로 무한한 명문장 필사 콘텐츠를 생성할 수 있습니다.
+        </p>
+        <div class="form-group">
+          <label for="input-api-key">Gemini API Key:</label>
+          <input type="password" id="input-api-key" placeholder="AIzaSy..." class="input-text">
+          <p id="key-status-text" class="helper-text"></p>
+        </div>
+        <div class="form-group" style="margin-top: 14px;">
+          <label for="modal-default-model">기본 AI 모델:</label>
+          <select id="modal-default-model" class="custom-select" style="width: 100%;">
+            <option value="gemini-3.8-flash">Gemini 3.8 Flash (추천)</option>
+            <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (경량)</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+          </select>
+        </div>
+        <div class="modal-links" style="margin-top: 14px;">
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">
+            🔗 Google AI Studio에서 무료/유료 API 키 발급받기
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-settings" class="btn-secondary">닫기</button>
+        <button id="btn-save-settings" class="btn-primary">저장하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

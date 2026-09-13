@@ -1,0 +1,33 @@
+# API 키가 포함될 수 있는 파일
+.env
+
+# SQLite 데이터베이스 (API 키가 settings 테이블에 저장됨)
+transcription.db
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 가상환경
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride

@@ -1,0 +1,743 @@
+:root {
+  --bg-app: #f4efe9;
+  --bg-sidebar: #ece5dc;
+  --bg-paper: #fcfbf9;
+  --text-main: #242424;
+  --text-muted: #6b635b;
+  --text-light: #948b81;
+  --accent-ink: #314256;
+  --accent-warm: #8c533e;
+  --accent-gold: #c28b38;
+  --border-subtle: #ded6cc;
+  --paper-shadow: 0 10px 30px rgba(74, 58, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --font-serif: "Nanum Myeongjo", "Batang", "Apple Myungjo", serif;
+  --font-sans: "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-body-size: 1.15rem;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ==================== 사이드바 ==================== */
+.sidebar {
+  width: 320px;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 24px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-icon {
+  font-size: 1.5rem;
+}
+
+.brand h2 {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.5px;
+}
+
+.brand-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.sidebar-actions {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dates-section {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px;
+}
+
+.dates-section h3 {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+}
+
+.dates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-group {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.date-group.active {
+  background: #ffffff;
+  border-color: var(--accent-ink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.date-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.date-header:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.date-badge {
+  font-size: 0.75rem;
+  background: var(--border-subtle);
+  color: var(--text-main);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.date-records-list {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.6);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.record-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.record-item:last-child {
+  border-bottom: none;
+}
+
+.record-item:hover, .record-item.selected {
+  background: rgba(49, 66, 86, 0.08);
+}
+
+.record-item-title {
+  font-family: var(--font-serif);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-item-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.sidebar-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ccc;
+  margin-left: 6px;
+}
+
+.status-dot.connected {
+  background: #27ae60;
+}
+
+/* ==================== 메인 영역 ==================== */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.top-toolbar {
+  padding: 16px 28px;
+  background: rgba(252, 251, 249, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.category-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-selector-group label {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.custom-select {
+  padding: 9px 14px;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background-color: #fff;
+  color: var(--text-main);
+  outline: none;
+  cursor: pointer;
+}
+
+.toolbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.font-controls {
+  display: flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.font-controls button {
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.font-controls button:last-child {
+  border-right: none;
+}
+
+.font-controls button:hover {
+  background: #f0f0f0;
+  color: var(--text-main);
+}
+
+/* ==================== 버튼 스타일 ==================== */
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--accent-ink);
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 0.94rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(49, 66, 86, 0.25);
+}
+
+.btn-primary:hover {
+  background-color: #1f2c3b;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  width: 100%;
+  padding: 9px 14px;
+  border: 1px solid var(--border-subtle);
+  background: #fff;
+  color: var(--text-main);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.btn-secondary.active, .btn-secondary:hover {
+  background: var(--accent-ink);
+  color: #fff;
+  border-color: var(--accent-ink);
+}
+
+.btn-outline {
+  padding: 8px 13px;
+  border: 1px solid var(--border-subtle);
+  background: #fff;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  color: var(--text-main);
+  transition: all 0.15s;
+}
+
+.btn-outline:hover {
+  background: #f5f3ef;
+  border-color: var(--text-muted);
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  color: var(--text-main);
+}
+
+/* ==================== 상태 바 및 배너 ==================== */
+.status-banner {
+  margin: 16px 28px 0;
+  padding: 12px 18px;
+  background: #e9f2fa;
+  border: 1px solid #b8d7ee;
+  border-radius: 8px;
+  color: #1c4b72;
+  font-size: 0.88rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status-banner.error {
+  background: #fdf2f2;
+  border-color: #f6caca;
+  color: #8c1e1e;
+}
+
+.status-banner.success {
+  background: #f0f8f3;
+  border-color: #c0e5cd;
+  color: #1a6b38;
+}
+
+.close-banner {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ==================== A4 용지 뷰어 ==================== */
+.paper-stage {
+  padding: 36px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.a4-sheet {
+  width: 100%;
+  max-width: 780px;
+  min-height: 1080px;
+  background-color: var(--bg-paper);
+  background-image: linear-gradient(rgba(0,0,0,0.01) 1px, transparent 1px);
+  background-size: 100% 32px;
+  padding: 65px 70px;
+  border-radius: 4px;
+  box-shadow: var(--paper-shadow);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-watermark {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  color: var(--text-light);
+  letter-spacing: 2px;
+}
+
+.sheet-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.meta-tags {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.badge-category {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-warm);
+  background: rgba(140, 83, 62, 0.09);
+  padding: 3px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+}
+
+.meta-date, .meta-chars {
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+.sheet-title {
+  font-family: var(--font-serif);
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.sheet-author {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: var(--text-muted);
+}
+
+.sheet-divider {
+  width: 60px;
+  height: 2px;
+  background-color: var(--accent-gold);
+  margin: 16px auto 36px;
+}
+
+.sheet-body {
+  font-family: var(--font-serif);
+  font-size: var(--font-body-size);
+  line-height: 2.3;
+  color: var(--text-main);
+  white-space: pre-wrap;
+  word-break: keep-all;
+  text-align: justify;
+  flex: 1;
+}
+
+.sheet-footer {
+  margin-top: 40px;
+  padding-top: 18px;
+  text-align: center;
+}
+
+.footer-line {
+  width: 100%;
+  height: 1px;
+  background: var(--border-subtle);
+  margin-bottom: 12px;
+}
+
+.footer-text {
+  font-size: 0.78rem;
+  color: var(--text-light);
+  font-family: var(--font-serif);
+  letter-spacing: 1px;
+}
+
+/* ==================== 필사 연습 패널 ==================== */
+.practice-panel {
+  width: 100%;
+  max-width: 780px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.practice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.practice-header h4 {
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.practice-stats {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: flex;
+  gap: 14px;
+}
+
+.practice-panel textarea {
+  width: 100%;
+  height: 180px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 14px;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.9;
+  resize: vertical;
+  outline: none;
+  background: #fdfdfd;
+}
+
+.practice-panel textarea:focus {
+  border-color: var(--accent-ink);
+  background: #ffffff;
+}
+
+/* ==================== 로딩 오버레이 ==================== */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(36, 36, 36, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.loading-card {
+  background: #ffffff;
+  padding: 36px 40px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  max-width: 440px;
+}
+
+.pen-animation {
+  font-size: 2.8rem;
+  margin-bottom: 16px;
+  animation: writePulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes writePulse {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-8px) rotate(-15deg); }
+}
+
+.loading-card h3 {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  margin-bottom: 8px;
+  color: var(--text-main);
+}
+
+.loading-card p {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+/* ==================== 모달 ==================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 200;
+}
+
+.modal-box {
+  background: #fff;
+  width: 90%;
+  max-width: 500px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.close-modal {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-body {
+  padding: 22px;
+}
+
+.info-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.input-text {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.helper-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.modal-links {
+  margin-top: 14px;
+}
+
+.modal-links a {
+  font-size: 0.85rem;
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+.modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ==================== A4 인쇄 최적화 (Print CSS) ==================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 20mm 20mm 20mm 20mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .app-container, .main-content, .paper-stage {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .a4-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    background: transparent !important;
+  }
+
+  .sheet-title {
+    font-size: 20pt !important;
+    color: #000 !important;
+  }
+
+  .sheet-body {
+    font-size: 11.5pt !important;
+    line-height: 2.2 !important;
+    color: #111 !important;
+  }
+
+  .badge-category {
+    border: 1px solid #999 !important;
+    background: transparent !important;
+    color: #000 !important;
+  }
+}
