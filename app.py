@@ -126,39 +126,31 @@ class HandwritingAppHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/generate":
             preferred_cat = payload.get("category")
             preferred_model = payload.get("model")
-            
-            item = gemini_client.generate_handwriting_text(
-                preferred_category=preferred_cat,
-                preferred_model=preferred_model
-            )
-            
+
+            # 중복 시 최대 3회 재생성 시도
+            max_retries = 3
+            item = None
+            for attempt in range(1, max_retries + 1):
+                item = gemini_client.generate_handwriting_text(
+                    preferred_category=preferred_cat,
+                    preferred_model=preferred_model
+                )
+                if not item or not item.get("content"):
+                    continue
+                if not is_content_duplicate(item["content"]):
+                    break  # 중복 아님 → 사용
+                print(f"[API /generate] 중복 감지 → 재생성 ({attempt}/{max_retries})")
+                item = None  # 중복이면 무효화
+
             if not item or not item.get("content"):
                 return self._send_error(500, "필사 글 생성 중 일시적인 문제가 발생했습니다.")
 
-            saved = None
-            if not is_content_duplicate(item["content"]):
-                saved = save_transcription(
-                    title=item["title"],
-                    author=item.get("author", "작자 미상"),
-                    category=item.get("category", "문학"),
-                    content=item["content"]
-                )
-
-            # 중복인 경우 제목에 표시를 추가하여 저장
-            if not saved:
-                title_mod = f"{item['title']} (새로 필사)"
-                content_mod = item["content"] + "\n\n(사색의 기록)"
-                saved = save_transcription(
-                    title=title_mod,
-                    author=item.get("author", "작자 미상"),
-                    category=item.get("category", "문학"),
-                    content=content_mod
-                )
-
-            if not saved:
-                recs = get_recent_transcriptions(limit=1)
-                if recs:
-                    saved = get_transcription_by_id(recs[0]["id"])
+            saved = save_transcription(
+                title=item["title"],
+                author=item.get("author", "작자 미상"),
+                category=item.get("category", "문학"),
+                content=item["content"]
+            )
 
             if saved:
                 saved["meta_message"] = item.get("message", "")
