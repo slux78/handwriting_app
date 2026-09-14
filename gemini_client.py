@@ -343,10 +343,38 @@ _EXTENDED_CATEGORIES = [
 ]
 
 
+def _normalize_title(title):
+    """제목에서 부제, 괄호, 특수문자 등을 제거하여 핵심 키워드만 추출."""
+    import re
+    t = title.strip()
+    # '제목 - 부제' 형식에서 주제목만
+    t = t.split(' - ')[0].split(' — ')[0].split(' : ')[0]
+    # 괄호 및 괄호 내용 제거
+    t = re.sub(r'[\(\)\[\]\{\}（）「」『』\-·]', ' ', t)
+    # 공백 정리
+    t = ' '.join(t.split()).strip()
+    return t
+
+
+def _is_title_duplicate(title, existing_items):
+    """제목이 기존 목록에 있는지 부분 일치(substring)로 확인."""
+    norm_new = _normalize_title(title)
+    if not norm_new:
+        return False
+    for item in existing_items:
+        norm_exist = _normalize_title(item.get('title', ''))
+        if not norm_exist:
+            continue
+        # 어느 한쪽이 다른 쪽에 포함되면 중복
+        if norm_new in norm_exist or norm_exist in norm_new:
+            return True
+    return False
+
+
 def _generate_live(api_key, preferred_category=None, preferred_model=None):
     """실시간 Gemini API 호출. 중복 시 최대 3회 재시도."""
-    # 기존 작품 목록을 최대 50개까지 가져와 중복 방지
-    existing_items = get_existing_titles_and_authors(limit=50)
+    # 기존 작품 목록을 최대한 많이 가져와 중복 방지
+    existing_items = get_existing_titles_and_authors(limit=200)
     existing_summary = ", ".join(
         [f"'{item['title']}'({item['author']})" for item in existing_items if item.get('title')]
     )
@@ -415,12 +443,8 @@ def _generate_live(api_key, preferred_category=None, preferred_model=None):
                 print(f"[Gemini API] {target_model}: 빈 콘텐츠 (시도 {attempt})")
                 continue
 
-            # 중복 체크: 제목+저자가 기존 목록에 있거나 콘텐츠 해시가 동일하면 재시도
-            is_title_dup = any(
-                item['title'] == title and item.get('author', '') == author
-                for item in existing_items
-            )
-            if is_title_dup or is_content_duplicate(content):
+            # 중복 체크: 제목 부분 일치 또는 콘텐츠 해시가 동일하면 재시도
+            if _is_title_duplicate(title, existing_items) or is_content_duplicate(content):
                 print(f"[Gemini API] 중복 감지 '「{title}」({author})' → 재시도 ({attempt}/{max_attempts})")
                 # 재시도 시 카테고리도 바꿔서 다양성 확보
                 selected_category = random.choice(_EXTENDED_CATEGORIES)
@@ -469,17 +493,20 @@ def generate_handwriting_text(api_key=None, preferred_category=None, preferred_m
     if not api_key:
         api_key = get_gemini_api_key()
 
-    existing_items = get_existing_titles_and_authors(limit=15)
-    existing_titles = [item['title'] for item in existing_items]
+    existing_items = get_existing_titles_and_authors(limit=200)
 
     # 1. 특정 분야 지정이 없는 경우, 프리페치 큐(즉시 반환) 확인
     if not preferred_category or preferred_category == "":
         try:
             cached = _prefetch_queue.get_nowait()
-            if not is_content_duplicate(cached["content"]):
+            # 제목 + 콘텐츠 해시 모두 중복 체크
+            if not _is_title_duplicate(cached.get("title", ""), existing_items) \
+               and not is_content_duplicate(cached["content"]):
                 trigger_background_prefetch(preferred_model=preferred_model)
                 cached["message"] = f"사전 준비된 Gemini AI ({cached.get('model', '')}) 문장으로 즉시 로드되었습니다."
                 return cached
+            else:
+                print(f"[Prefetch] 프리페치 캐시 중복 감지 → 폐기: 「{cached.get('title', '')}」")
         except queue.Empty:
             pass
 
@@ -491,7 +518,7 @@ def generate_handwriting_text(api_key=None, preferred_category=None, preferred_m
             return live_item
 
     # 3. 네트워크 장애 또는 API 실패 시 엄선 보관함 폴백
-    candidates = [c for c in CURATED_FALLBACKS if c['title'] not in existing_titles]
+    candidates = [c for c in CURATED_FALLBACKS if not _is_title_duplicate(c['title'], existing_items)]
     chosen = random.choice(candidates) if candidates else random.choice(CURATED_FALLBACKS)
     return {
         "title": chosen["title"],
