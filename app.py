@@ -127,20 +127,10 @@ class HandwritingAppHandler(http.server.SimpleHTTPRequestHandler):
             preferred_cat = payload.get("category")
             preferred_model = payload.get("model")
 
-            # 중복 시 최대 3회 재생성 시도
-            max_retries = 3
-            item = None
-            for attempt in range(1, max_retries + 1):
-                item = gemini_client.generate_handwriting_text(
-                    preferred_category=preferred_cat,
-                    preferred_model=preferred_model
-                )
-                if not item or not item.get("content"):
-                    continue
-                if not is_content_duplicate(item["content"]):
-                    break  # 중복 아님 → 사용
-                print(f"[API /generate] 중복 감지 → 재생성 ({attempt}/{max_retries})")
-                item = None  # 중복이면 무효화
+            item = gemini_client.generate_handwriting_text(
+                preferred_category=preferred_cat,
+                preferred_model=preferred_model
+            )
 
             if not item or not item.get("content"):
                 return self._send_error(500, "필사 글 생성 중 일시적인 문제가 발생했습니다.")
