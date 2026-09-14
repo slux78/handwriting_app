@@ -468,8 +468,17 @@ def _generate_live(api_key, preferred_category=None, preferred_model=None):
                 "message": f"Gemini AI ({target_model})로 {elapsed}초 만에 생성되었습니다.",
                 "model": target_model
             }
+        except urllib.error.HTTPError as e:
+            elapsed = round(time.time() - t0, 2)
+            if e.code == 429:
+                print(f"[Gemini API] 할당량 초과 (429) → 재시도 중단, 폴백 사용")
+                return None  # 즉시 중단 → 폴백으로
+            print(f"[Gemini API] {target_model} 실패 ({elapsed}초, 시도 {attempt}): {e}")
         except Exception as e:
             elapsed = round(time.time() - t0, 2)
+            if "429" in str(e):
+                print(f"[Gemini API] 할당량 초과 (429) → 재시도 중단, 폴백 사용")
+                return None  # 즉시 중단 → 폴백으로
             print(f"[Gemini API] {target_model} 실패 ({elapsed}초, 시도 {attempt}): {e}")
 
     return None
