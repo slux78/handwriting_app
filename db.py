@@ -37,6 +37,17 @@ def init_db(db_path=None):
             value TEXT NOT NULL
         );
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS title_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            author TEXT,
+            created_at TEXT NOT NULL
+        );
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_title_history_title ON title_history(title);
+    """)
     conn.commit()
     conn.close()
 
@@ -169,3 +180,31 @@ def set_setting(key, value, db_path=None):
     """, (key, value))
     conn.commit()
     conn.close()
+
+def save_title_history(title, author="", db_path=None):
+    """생성된 제목을 이력에 저장 (중복 방지용)."""
+    if db_path is None:
+        db_path = get_db_path()
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO title_history (title, author, created_at) VALUES (?, ?, ?)",
+        (title.strip(), (author or "").strip(), now)
+    )
+    conn.commit()
+    conn.close()
+
+def get_title_history(limit=500, db_path=None):
+    """생성 이력에서 제목 목록을 가져옴."""
+    if db_path is None:
+        db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT DISTINCT title, author FROM title_history ORDER BY id DESC LIMIT ?",
+        (limit,)
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return [{"title": r[0], "author": r[1] or ""} for r in rows]

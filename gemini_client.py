@@ -9,7 +9,7 @@ import threading
 import queue
 import time
 
-from db import get_existing_titles_and_authors, get_setting, is_content_duplicate
+from db import get_existing_titles_and_authors, get_setting, is_content_duplicate, save_title_history, get_title_history
 
 # macOS 환경에서 IPv6 DNS 블랙홀로 인한 15~25초 지연/타임아웃을 방지하기 위해 IPv4 강제 적용
 _ipv4_patched = False
@@ -372,12 +372,14 @@ def _is_title_duplicate(title, existing_items):
 
 
 def _generate_live(api_key, preferred_category=None, preferred_model=None):
-    """실시간 Gemini API 호출. 중복 시 최대 3회 재시도."""
-    # 기존 작품 목록을 최대한 많이 가져와 중복 방지
+    """실시간 Gemini API 호출. 중복 시 최대 5회 재시도."""
+    # DB에서 기존 작품 + 생성 이력을 모두 가져와 중복 방지
     existing_items = get_existing_titles_and_authors(limit=200)
-    existing_summary = ", ".join(
-        [f"'{item['title']}'({item['author']})" for item in existing_items if item.get('title')]
-    )
+    title_history_items = get_title_history(limit=500)
+    all_excluded_items = existing_items + title_history_items
+
+    excluded_titles = [item['title'] for item in all_excluded_items if item.get('title')]
+    existing_summary = ", ".join([f"'{t}'" for t in excluded_titles])
 
     selected_category = (
         preferred_category if preferred_category in _EXTENDED_CATEGORIES
@@ -385,7 +387,7 @@ def _generate_live(api_key, preferred_category=None, preferred_model=None):
     )
 
     target_model = preferred_model or get_preferred_model()
-    max_attempts = 3
+    max_attempts = 5
 
     for attempt in range(1, max_attempts + 1):
         # 매 시도마다 스타일/시대를 랜덤으로 변경하여 다양성 확보
@@ -444,11 +446,17 @@ def _generate_live(api_key, preferred_category=None, preferred_model=None):
                 continue
 
             # 중복 체크: 제목 부분 일치 또는 콘텐츠 해시가 동일하면 재시도
-            if _is_title_duplicate(title, existing_items) or is_content_duplicate(content):
-                print(f"[Gemini API] 중복 감지 '「{title}」({author})' → 재시도 ({attempt}/{max_attempts})")
-                # 재시도 시 카테고리도 바꿔서 다양성 확보
+            if _is_title_duplicate(title, all_excluded_items) or is_content_duplicate(content):
+                save_title_history(title, author)  # DB에 이력 저장
+                print(f"[Gemini API] 중복 감지 '「{title}」({author})' → DB 이력 저장, 재시도 ({attempt}/{max_attempts})")
+                # 재시도 시 제외 목록 갱신 & 카테고리 변경
+                excluded_titles.append(title)
+                existing_summary = ", ".join([f"'{t}'" for t in excluded_titles])
                 selected_category = random.choice(_EXTENDED_CATEGORIES)
                 continue
+
+            # 성공한 제목도 DB 이력에 저장
+            save_title_history(title, author)
 
             print(f"[Gemini API] 호출 성공: {target_model} ({elapsed}초 소요)")
             return {
@@ -494,19 +502,23 @@ def generate_handwriting_text(api_key=None, preferred_category=None, preferred_m
         api_key = get_gemini_api_key()
 
     existing_items = get_existing_titles_and_authors(limit=200)
+    # DB 생성 이력도 합산하여 중복 체크
+    title_history_items = get_title_history(limit=500)
+    all_excluded_items = existing_items + title_history_items
 
     # 1. 특정 분야 지정이 없는 경우, 프리페치 큐(즉시 반환) 확인
     if not preferred_category or preferred_category == "":
         try:
             cached = _prefetch_queue.get_nowait()
             # 제목 + 콘텐츠 해시 모두 중복 체크
-            if not _is_title_duplicate(cached.get("title", ""), existing_items) \
+            if not _is_title_duplicate(cached.get("title", ""), all_excluded_items) \
                and not is_content_duplicate(cached["content"]):
                 trigger_background_prefetch(preferred_model=preferred_model)
                 cached["message"] = f"사전 준비된 Gemini AI ({cached.get('model', '')}) 문장으로 즉시 로드되었습니다."
                 return cached
             else:
-                print(f"[Prefetch] 프리페치 캐시 중복 감지 → 폐기: 「{cached.get('title', '')}」")
+                save_title_history(cached.get("title", ""), cached.get("author", ""))
+                print(f"[Prefetch] 프리페치 캐시 중복 감지 → 폐기 & DB 이력 저장: 「{cached.get('title', '')}」")
         except queue.Empty:
             pass
 
@@ -518,7 +530,7 @@ def generate_handwriting_text(api_key=None, preferred_category=None, preferred_m
             return live_item
 
     # 3. 네트워크 장애 또는 API 실패 시 엄선 보관함 폴백
-    candidates = [c for c in CURATED_FALLBACKS if not _is_title_duplicate(c['title'], existing_items)]
+    candidates = [c for c in CURATED_FALLBACKS if not _is_title_duplicate(c['title'], all_excluded_items)]
     chosen = random.choice(candidates) if candidates else random.choice(CURATED_FALLBACKS)
     return {
         "title": chosen["title"],
