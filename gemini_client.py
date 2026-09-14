@@ -228,7 +228,7 @@ def get_preferred_model():
 def _build_gen_config(model_name):
     """모델별 최적 generationConfig 생성. thinkingConfig 지원 여부에 따라 분기."""
     gen_config = {
-        "temperature": 0.7,
+        "temperature": 0.9,
         "topP": 0.9,
         "maxOutputTokens": 2048,
         "responseMimeType": "application/json"
@@ -308,19 +308,72 @@ def _call_gemini_api(api_key, model_name, prompt, retry_without_thinking=True):
         raise e
 
 
+# 프롬프트 다양성을 위한 랜덤 요소들
+_STYLE_DIRECTIVES = [
+    "서정적이고 감성적인 문체로",
+    "담백하고 절제된 문체로",
+    "철학적이고 사색적인 문체로",
+    "서사적이고 웅장한 문체로",
+    "따뜻하고 위로가 되는 문체로",
+    "고요하고 명상적인 문체로",
+    "강렬하고 열정적인 문체로",
+    "유려하고 시적인 문체로",
+]
+
+_ERA_DIRECTIVES = [
+    "고전 작품(19세기 이전) 중에서",
+    "근대 문학(19세기~20세기 초) 중에서",
+    "현대 문학(20세기 중반 이후) 중에서",
+    "동양 고전 중에서",
+    "서양 고전 중에서",
+    "한국 근현대 문학 중에서",
+    "일본 문학 중에서",
+    "유럽 문학 중에서",
+    "러시아 문학 중에서",
+    "남미 문학 중에서",
+    "시대와 국적에 관계없이 숨겨진 명문 중에서",
+]
+
+_EXTENDED_CATEGORIES = [
+    "시", "소설", "에세이", "여행기",
+    "위대한 사상가의 명언 및 철학 수필",
+    "편지글", "일기문학", "회고록",
+    "자연과학 산문", "역사 서술",
+    "고전 산문", "명연설문",
+]
+
+
 def _generate_live(api_key, preferred_category=None, preferred_model=None):
-    """실시간 Gemini API 호출. 지정 모델 1개만 시도 (폴백 모델 루프 제거로 지연 방지)."""
-    existing_items = get_existing_titles_and_authors(limit=10)
-    existing_summary = ", ".join([f"'{item['title']}'({item['author']})" for item in existing_items if item.get('title')])
+    """실시간 Gemini API 호출. 중복 시 최대 3회 재시도."""
+    # 기존 작품 목록을 최대 50개까지 가져와 중복 방지
+    existing_items = get_existing_titles_and_authors(limit=50)
+    existing_summary = ", ".join(
+        [f"'{item['title']}'({item['author']})" for item in existing_items if item.get('title')]
+    )
 
-    categories = ["시", "소설", "에세이", "여행기", "위대한 사상가의 명언 및 철학 수필"]
-    selected_category = preferred_category if preferred_category in categories else random.choice(categories)
+    selected_category = (
+        preferred_category if preferred_category in _EXTENDED_CATEGORIES
+        else random.choice(_EXTENDED_CATEGORIES)
+    )
 
-    prompt = f"""당신은 마음을 정돈하는 필사(손글씨 연습) 전문가입니다.
+    target_model = preferred_model or get_preferred_model()
+    max_attempts = 3
+
+    for attempt in range(1, max_attempts + 1):
+        # 매 시도마다 스타일/시대를 랜덤으로 변경하여 다양성 확보
+        style = random.choice(_STYLE_DIRECTIVES)
+        era = random.choice(_ERA_DIRECTIVES)
+        seed_hint = random.randint(1, 99999)
+
+        prompt = f"""당신은 마음을 정돈하는 필사(손글씨 연습) 전문가입니다.
 1. 분야: {selected_category}
-2. 분량: A4 1장 손글씨용 (공백 포함 약 750자~950자 내외). 문단을 명확히 나눌 것.
-3. 톤: 장난기 없는 진중하고 격조 높은 한국어 문체.
-4. 중복 제외: [{existing_summary}]
+2. 스타일: {style}
+3. 시대/지역: {era}
+4. 분량: A4 1장 손글씨용 (공백 포함 약 750자~950자 내외). 문단을 명확히 나눌 것.
+5. 톤: 장난기 없는 진중하고 격조 높은 한국어 문체.
+6. 중복 제외 (아래 작품들은 절대 다시 선택하지 말 것): [{existing_summary}]
+7. 독창성: 널리 알려진 작품보다는 잘 알려지지 않은 숨은 명작이나 명문장을 우선 선택하라.
+8. 다양성 시드: {seed_hint} (이 숫자를 참고하여 이전과 전혀 다른 작품을 선택하라)
 
 반드시 JSON만 응답:
 {{
@@ -330,38 +383,50 @@ def _generate_live(api_key, preferred_category=None, preferred_model=None):
   "content": "필사 본문 텍스트"
 }}"""
 
-    target_model = preferred_model or get_preferred_model()
-    t0 = time.time()
+        t0 = time.time()
+        try:
+            print(f"[Gemini API] 호출 시작 (시도 {attempt}/{max_attempts}): {target_model}...")
+            result_json = _call_gemini_api(api_key, target_model, prompt)
 
-    try:
-        print(f"[Gemini API] 호출 시작: {target_model}...")
-        result_json = _call_gemini_api(api_key, target_model, prompt)
-        
-        candidates = result_json.get("candidates", [])
-        if not candidates:
-            print(f"[Gemini API] {target_model}: 빈 응답")
-            return None
-        content_text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        
-        clean_text = content_text.strip()
-        if clean_text.startswith("```json"):
-            clean_text = clean_text[7:]
-        if clean_text.startswith("```"):
-            clean_text = clean_text[3:]
-        if clean_text.endswith("```"):
-            clean_text = clean_text[:-3]
-        clean_text = clean_text.strip()
+            candidates = result_json.get("candidates", [])
+            if not candidates:
+                print(f"[Gemini API] {target_model}: 빈 응답")
+                continue
+            content_text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
 
-        parsed = json.loads(clean_text)
-        title = parsed.get("title", "무제").strip()
-        author = parsed.get("author", "작자 미상").strip()
-        category = parsed.get("category", selected_category).strip()
-        content = parsed.get("content", "").strip()
+            clean_text = content_text.strip()
+            if clean_text.startswith("```json"):
+                clean_text = clean_text[7:]
+            if clean_text.startswith("```"):
+                clean_text = clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            clean_text = clean_text.strip()
 
-        elapsed = round(time.time() - t0, 2)
-        print(f"[Gemini API] 호출 성공: {target_model} ({elapsed}초 소요)")
+            parsed = json.loads(clean_text)
+            title = parsed.get("title", "무제").strip()
+            author = parsed.get("author", "작자 미상").strip()
+            category = parsed.get("category", selected_category).strip()
+            content = parsed.get("content", "").strip()
 
-        if content:
+            elapsed = round(time.time() - t0, 2)
+
+            if not content:
+                print(f"[Gemini API] {target_model}: 빈 콘텐츠 (시도 {attempt})")
+                continue
+
+            # 중복 체크: 제목+저자가 기존 목록에 있거나 콘텐츠 해시가 동일하면 재시도
+            is_title_dup = any(
+                item['title'] == title and item.get('author', '') == author
+                for item in existing_items
+            )
+            if is_title_dup or is_content_duplicate(content):
+                print(f"[Gemini API] 중복 감지 '「{title}」({author})' → 재시도 ({attempt}/{max_attempts})")
+                # 재시도 시 카테고리도 바꿔서 다양성 확보
+                selected_category = random.choice(_EXTENDED_CATEGORIES)
+                continue
+
+            print(f"[Gemini API] 호출 성공: {target_model} ({elapsed}초 소요)")
             return {
                 "title": title,
                 "author": author,
@@ -371,9 +436,9 @@ def _generate_live(api_key, preferred_category=None, preferred_model=None):
                 "message": f"Gemini AI ({target_model})로 {elapsed}초 만에 생성되었습니다.",
                 "model": target_model
             }
-    except Exception as e:
-        elapsed = round(time.time() - t0, 2)
-        print(f"[Gemini API] {target_model} 실패 ({elapsed}초): {e}")
+        except Exception as e:
+            elapsed = round(time.time() - t0, 2)
+            print(f"[Gemini API] {target_model} 실패 ({elapsed}초, 시도 {attempt}): {e}")
 
     return None
 
