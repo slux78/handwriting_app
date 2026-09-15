@@ -470,15 +470,17 @@ def _generate_live(api_key, preferred_category=None, preferred_model=None):
             }
         except urllib.error.HTTPError as e:
             elapsed = round(time.time() - t0, 2)
-            if e.code == 429:
-                print(f"[Gemini API] 할당량 초과 (429) → 재시도 중단, 폴백 사용")
-                return None  # 즉시 중단 → 폴백으로
+            if e.code in (429, 503):
+                reason = "할당량 초과" if e.code == 429 else "서버 과부하"
+                print(f"[Gemini API] {reason} ({e.code}) → 재시도 중단, 폴백 사용")
+                return None
             print(f"[Gemini API] {target_model} 실패 ({elapsed}초, 시도 {attempt}): {e}")
         except Exception as e:
             elapsed = round(time.time() - t0, 2)
-            if "429" in str(e):
-                print(f"[Gemini API] 할당량 초과 (429) → 재시도 중단, 폴백 사용")
-                return None  # 즉시 중단 → 폴백으로
+            err_str = str(e)
+            if "429" in err_str or "503" in err_str:
+                print(f"[Gemini API] API 오류 → 재시도 중단, 폴백 사용")
+                return None
             print(f"[Gemini API] {target_model} 실패 ({elapsed}초, 시도 {attempt}): {e}")
 
     return None
@@ -507,45 +509,56 @@ def trigger_background_prefetch(preferred_model=None):
     t.start()
 
 def generate_handwriting_text(api_key=None, preferred_category=None, preferred_model=None):
-    if not api_key:
-        api_key = get_gemini_api_key()
+    """API 실패 시에도 반드시 콘텐츠를 반환. 절대 None을 리턴하지 않음."""
+    try:
+        if not api_key:
+            api_key = get_gemini_api_key()
 
-    existing_items = get_existing_titles_and_authors(limit=200)
-    # DB 생성 이력도 합산하여 중복 체크
-    title_history_items = get_title_history(limit=500)
-    all_excluded_items = existing_items + title_history_items
+        existing_items = get_existing_titles_and_authors(limit=200)
+        title_history_items = get_title_history(limit=500)
+        all_excluded_items = existing_items + title_history_items
 
-    # 1. 특정 분야 지정이 없는 경우, 프리페치 큐(즉시 반환) 확인
-    if not preferred_category or preferred_category == "":
-        try:
-            cached = _prefetch_queue.get_nowait()
-            # 제목 + 콘텐츠 해시 모두 중복 체크
-            if not _is_title_duplicate(cached.get("title", ""), all_excluded_items) \
-               and not is_content_duplicate(cached["content"]):
+        # 1. 프리페치 큐 확인
+        if not preferred_category or preferred_category == "":
+            try:
+                cached = _prefetch_queue.get_nowait()
+                if not _is_title_duplicate(cached.get("title", ""), all_excluded_items) \
+                   and not is_content_duplicate(cached["content"]):
+                    trigger_background_prefetch(preferred_model=preferred_model)
+                    cached["message"] = f"사전 준비된 Gemini AI ({cached.get('model', '')}) 문장으로 즉시 로드되었습니다."
+                    return cached
+                else:
+                    save_title_history(cached.get("title", ""), cached.get("author", ""))
+            except queue.Empty:
+                pass
+
+        # 2. 실시간 Gemini API 호출
+        if api_key:
+            live_item = _generate_live(api_key, preferred_category=preferred_category, preferred_model=preferred_model)
+            if live_item:
                 trigger_background_prefetch(preferred_model=preferred_model)
-                cached["message"] = f"사전 준비된 Gemini AI ({cached.get('model', '')}) 문장으로 즉시 로드되었습니다."
-                return cached
-            else:
-                save_title_history(cached.get("title", ""), cached.get("author", ""))
-                print(f"[Prefetch] 프리페치 캐시 중복 감지 → 폐기 & DB 이력 저장: 「{cached.get('title', '')}」")
-        except queue.Empty:
-            pass
+                return live_item
 
-    # 2. 실시간 Gemini API 호출
-    if api_key:
-        live_item = _generate_live(api_key, preferred_category=preferred_category, preferred_model=preferred_model)
-        if live_item:
-            trigger_background_prefetch(preferred_model=preferred_model)
-            return live_item
+        # 3. 엄선 보관함 폴백
+        candidates = [c for c in CURATED_FALLBACKS if not _is_title_duplicate(c['title'], all_excluded_items)]
+        chosen = random.choice(candidates) if candidates else random.choice(CURATED_FALLBACKS)
+        return {
+            "title": chosen["title"],
+            "author": chosen["author"],
+            "category": chosen["category"],
+            "content": chosen["content"],
+            "source": "curated_fallback",
+            "message": "Gemini API 연결 지연으로 엄선 보관함에서 제공되었습니다."
+        }
 
-    # 3. 네트워크 장애 또는 API 실패 시 엄선 보관함 폴백
-    candidates = [c for c in CURATED_FALLBACKS if not _is_title_duplicate(c['title'], all_excluded_items)]
-    chosen = random.choice(candidates) if candidates else random.choice(CURATED_FALLBACKS)
-    return {
-        "title": chosen["title"],
-        "author": chosen["author"],
-        "category": chosen["category"],
-        "content": chosen["content"],
-        "source": "curated_fallback",
-        "message": "Gemini API 연결 지연으로 엄선 보관함에서 제공되었습니다."
-    }
+    except Exception as e:
+        print(f"[generate_handwriting_text] 예외 발생, 긴급 폴백: {e}")
+        chosen = random.choice(CURATED_FALLBACKS)
+        return {
+            "title": chosen["title"],
+            "author": chosen["author"],
+            "category": chosen["category"],
+            "content": chosen["content"],
+            "source": "curated_fallback",
+            "message": "Gemini API 연결 지연으로 엄선 보관함에서 제공되었습니다."
+        }
